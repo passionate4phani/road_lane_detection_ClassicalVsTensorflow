@@ -15,7 +15,6 @@ st.title("🛣️ Road Lane Detection — Classical vs Tensorflow")
 with st.sidebar:
     st.header("Settings")
     method = st.selectbox("Choose Method", ["Classical (Canny + Hough)", "Deep Learning (Tensorflow)"])
-    show_edges = st.checkbox("Show edges mask (debug)", False)
     st.markdown("---")
     st.caption("Upload a small image/GIF/video. Processing happens locally.")
 
@@ -48,8 +47,6 @@ if uploaded is not None:
             with col2:
                 st.subheader("Detected Lanes")
                 st.image(res_rgb, use_container_width=True)
-                if show_edges and dbg is not None:
-                    st.image(dbg, caption="Edges (debug)", use_container_width=True)
             outname = "output_classical.png"
             _, buf = cv2.imencode(".png", res_rgb[:, :, ::-1])
             st.download_button("Download output", data=buf.tobytes(), file_name=outname, mime="image/png")
@@ -61,8 +58,6 @@ if uploaded is not None:
             with col2:
                 st.subheader("Detected Lanes (Keras)")
                 st.image(res_rgb, use_container_width=True)
-                if show_edges and mask is not None:
-                    st.image(mask, caption="Mask (debug)", use_container_width=True)
             outname = "output_unet.png"
             _, buf = cv2.imencode(".png", res_rgb[:, :, ::-1])
             st.download_button("Download output", data=buf.tobytes(), file_name=outname, mime="image/png")
