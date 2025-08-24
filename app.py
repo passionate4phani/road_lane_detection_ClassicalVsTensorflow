@@ -5,16 +5,16 @@ import tempfile
 from PIL import Image, ImageSequence
 from pathlib import Path
 from src.classical.canny_hough import process_frame_classical
-from src.deep_learning.inference import load_unet, segment_frame_unet
+from src.deep_learning.inference import load_keras, segment_frame_keras
 import imageio.v2 as imageio
 
 st.set_page_config(page_title="Lane Detection", layout="wide")
 
-st.title("🛣️ Road Lane Detection — Classical vs U-Net")
+st.title("🛣️ Road Lane Detection — Classical vs Tensorflow")
 
 with st.sidebar:
     st.header("Settings")
-    method = st.selectbox("Choose Method", ["Classical (Canny + Hough)", "Deep Learning (U-Net)"])
+    method = st.selectbox("Choose Method", ["Classical (Canny + Hough)", "Deep Learning (Tensorflow)"])
     show_edges = st.checkbox("Show edges mask (debug)", False)
     st.markdown("---")
     st.caption("Upload a small image/GIF/video. Processing happens locally.")
@@ -22,7 +22,6 @@ with st.sidebar:
 uploaded = st.file_uploader("Upload image / GIF / short video", type=["png","jpg","jpeg","bmp","gif","mp4","avi","mov","mkv"])
 
 col1, col2 = st.columns(2)
-raw_bytes = None
 
 def bytes_to_tempfile(file, suffix):
     tfile = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
@@ -31,8 +30,8 @@ def bytes_to_tempfile(file, suffix):
     return tfile.name
 
 @st.cache_resource
-def _load_unet_once():
-    return load_unet(weights_path="models/unet_lane.pth")
+def _load_keras_once():
+    return load_keras(weights_path="models/best_model.keras")
 
 if uploaded is not None:
     suffix = Path(uploaded.name).suffix.lower()
@@ -51,16 +50,16 @@ if uploaded is not None:
                 st.image(res_rgb, use_container_width=True)
                 if show_edges and dbg is not None:
                     st.image(dbg, caption="Edges (debug)", use_container_width=True)
-            # download
             outname = "output_classical.png"
             _, buf = cv2.imencode(".png", res_rgb[:, :, ::-1])
             st.download_button("Download output", data=buf.tobytes(), file_name=outname, mime="image/png")
         else:
-            unet = _load_unet_once()
-            overlay, mask = segment_frame_unet(unet, frame)
+            with st.spinner("Running Keras inference... ⏳"):
+                keras = _load_keras_once()
+                overlay, mask = segment_frame_keras(keras, frame)
             res_rgb = overlay[:, :, ::-1]
             with col2:
-                st.subheader("Detected Lanes (U-Net)")
+                st.subheader("Detected Lanes (Keras)")
                 st.image(res_rgb, use_container_width=True)
                 if show_edges and mask is not None:
                     st.image(mask, caption="Mask (debug)", use_container_width=True)
@@ -76,31 +75,24 @@ if uploaded is not None:
             for f in frames:
                 ov, _ = process_frame_classical(f, return_debug=False)
                 processed.append(ov[:, :, ::-1])  # to RGB for gif
-            with col1:
-                st.subheader("Original GIF")
-                st.image(uploaded, use_container_width=True)
-            with col2:
-                st.subheader("Detected Lanes")
-                st.image(processed[0], use_container_width=True)
-            out_gif = tempfile.NamedTemporaryFile(delete=False, suffix=".gif").name
-            imageio.mimsave(out_gif, processed, fps=10)
-            with open(out_gif, "rb") as f:
-                st.download_button("Download processed GIF", f, file_name="output_classical.gif", mime="image/gif")
         else:
-            unet = _load_unet_once()
-            for f in frames:
-                ov, _ = segment_frame_unet(unet, f)
+            keras = _load_keras_once()
+            progress = st.progress(0)
+            for i, f in enumerate(frames):
+                ov, _ = segment_frame_keras(keras, f)
                 processed.append(ov[:, :, ::-1])
-            with col1:
-                st.subheader("Original GIF")
-                st.image(uploaded, use_container_width=True)
-            with col2:
-                st.subheader("Detected Lanes (U-Net)")
-                st.image(processed[0], use_container_width=True)
-            out_gif = tempfile.NamedTemporaryFile(delete=False, suffix=".gif").name
-            imageio.mimsave(out_gif, processed, fps=10)
-            with open(out_gif, "rb") as f:
-                st.download_button("Download processed GIF", f, file_name="output_unet.gif", mime="image/gif")
+                progress.progress((i + 1) / len(frames))
+            progress.empty()
+        with col1:
+            st.subheader("Original GIF")
+            st.image(uploaded, use_container_width=True)
+        with col2:
+            st.subheader(f"Detected Lanes ({method})")
+            st.image(processed[0], use_container_width=True)
+        out_gif = tempfile.NamedTemporaryFile(delete=False, suffix=".gif").name
+        imageio.mimsave(out_gif, processed, fps=10)
+        with open(out_gif, "rb") as f:
+            st.download_button("Download processed GIF", f, file_name=f"output_{method.lower().split()[0]}.gif", mime="image/gif")
 
     else:
         # Video case
@@ -122,31 +114,25 @@ if uploaded is not None:
                 for f in frames:
                     ov, _ = process_frame_classical(f, return_debug=False)
                     processed.append(ov)
-                with col1:
-                    st.subheader("Original Video (first frame)")
-                    st.image(frames[0][:,:,::-1], use_container_width=True)
-                with col2:
-                    st.subheader("Detected Lanes (first frame)")
-                    st.image(processed[0][:,:,::-1], use_container_width=True)
-
-                out_gif = tempfile.NamedTemporaryFile(delete=False, suffix=".gif").name
-                imageio.mimsave(out_gif, [p[:,:,::-1] for p in processed], fps=15)
-                with open(out_gif, "rb") as f:
-                    st.download_button("Download processed GIF", f, file_name="output_classical.gif", mime="image/gif")
             else:
-                unet = _load_unet_once()
-                for f in frames:
-                    ov, _ = segment_frame_unet(unet, f)
+                keras = _load_keras_once()
+                progress = st.progress(0)
+                for i, f in enumerate(frames):
+                    ov, _ = segment_frame_keras(keras, f)
                     processed.append(ov)
-                with col1:
-                    st.subheader("Original Video (first frame)")
-                    st.image(frames[0][:,:,::-1], use_container_width=True)
-                with col2:
-                    st.subheader("Detected Lanes (U-Net, first frame)")
-                    st.image(processed[0][:,:,::-1], use_container_width=True)
-                out_gif = tempfile.NamedTemporaryFile(delete=False, suffix=".gif").name
-                imageio.mimsave(out_gif, [p[:,:,::-1] for p in processed], fps=15)
-                with open(out_gif, "rb") as f:
-                    st.download_button("Download processed GIF", f, file_name="output_unet.gif", mime="image/gif")
+                    progress.progress((i + 1) / len(frames))
+                progress.empty()
+
+            with col1:
+                st.subheader("Original Video (first frame)")
+                st.image(frames[0][:,:,::-1], use_container_width=True)
+            with col2:
+                st.subheader(f"Detected Lanes ({method}, first frame)")
+                st.image(processed[0][:,:,::-1], use_container_width=True)
+
+            out_gif = tempfile.NamedTemporaryFile(delete=False, suffix=".gif").name
+            imageio.mimsave(out_gif, [p[:,:,::-1] for p in processed], fps=15)
+            with open(out_gif, "rb") as f:
+                st.download_button("Download processed GIF", f, file_name=f"output_{method.lower().split()[0]}.gif", mime="image/gif")
 else:
     st.info("Upload an image, GIF, or a short video to get started.")

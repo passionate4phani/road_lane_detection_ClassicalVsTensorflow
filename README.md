@@ -4,7 +4,7 @@ An end-to-end project that detects road lanes from images, GIFs, and short video
 It implements and compares two approaches:
 
 1. **Classical CV:** Canny Edge Detection + Probabilistic Hough Transform  
-2. **Deep Learning:** U-Net segmentation (PyTorch). If weights aren't provided, the app gracefully falls back to the classical mask.
+2. **Deep Learning:** U-Net segmentation (Tensorflow). If trained weights/model aren't provided, the app gracefully falls back to the classical mask.
 
 ## ✨ Features
 
@@ -42,7 +42,9 @@ lane_detection_project/
 │       ├── plot_examples.py
 │       └── make_gif.py
 ├── notebooks/
-    └── RoadLaneDetection.ipynb
+│   └── RoadLaneDetection.ipynb
+└── models/
+    └── best_model.keras
 ```
 
 ## 🚀 Quickstart
@@ -61,34 +63,4 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Then open the browser tab that Streamlit prints, upload a small **image/GIF/video**, and pick **Classical** or **Deep Learning**.
 
-> **Note:** For U-Net, place your trained weights as `models/unet_lane.pth`. If absent, the pipeline will fallback to classical edges to form a segmentation mask for visualization so that the comparison page still works for demo purposes.
-
-## 🧠 Training (Optional)
-
-- Use `src/deep_learning/train.py` with a lane dataset such as **TuSimple**.  
-- Configure dataset roots in `dataset.py`.  
-- The script saves checkpoints into `models/checkpoints/` and a final `models/unet_lane.pth`.
-
-## 📊 Demo GIFs / Screenshots
-
-Below are example outputs included in this repository (generated from synthetic demo media):
-
-- `outputs/classical/demo_image_overlay.png`
-- `outputs/classical/demo_video_classical.gif`
-- `outputs/deep_learning/demo_video_unet.gif` *(will mirror classical edges unless you provide weights)*
-
-![Classical Overlay](outputs/classical/demo_image_overlay.png)
-
-## 🛣 Future Improvements
-
-- Lane curvature & radius estimation
-- Robust perspective transform + polynomial fitting
-- Lane tracking with temporal smoothing (Kalman/EMA)
-- On-road inference with webcam/RTSP support
-
----
-
-**Author:** You 💚 — built for internship showcase.  
-If this helps you, consider adding a ⭐ in your repo!
